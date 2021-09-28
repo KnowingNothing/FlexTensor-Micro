@@ -228,7 +228,7 @@ res_shapes_b1 = [
     # (1, 512, 7, 7, 2048, 512, 1, 1, 1, 1, 0, 1, 1),  # res5c_branch2c
 ]
 
-res_shapes = [copy_change_batch(64, x) for x in res_shapes_b1]
+res_shapes = [copy_change_batch(1, x) for x in res_shapes_b1]
 
 vgg_16_shapes = [
     # vgg-16

@@ -3,3 +3,5 @@ notes
 experiment_data
 *vscode*
 .idea
+lib
+*.log

@@ -83,10 +83,10 @@ def build_func(func_name, task_key, configs, op_pos=None, rpc_info=None, rewrite
         target_host = None
 
     task = TASK_TABLE[task_key]
-    try:
-        s, bufs = schedule_with_config(task_key, configs, op_pos=op_pos, rewrite=rewrite)
-    except Exception as e:
-        print(e)
+    # try:
+    s, bufs = schedule_with_config(task_key, configs, op_pos=op_pos, rewrite=rewrite)
+    # except Exception as e:
+    #     print(e)
 
     stmt = tvm.lower(s, bufs, simple_mode=True)
     valid = verify_code(stmt, task.target, task.dev_id)
@@ -176,7 +176,8 @@ def eval_func(func_file, bufs_shape, dtype, target, number=100, dev_id=0, rpc_in
 
         time_cost = evaluator(*tvm_arys).mean * 1e3
     except Exception as e:
-        print(e)
+        # print(e)
+        return float("inf")
     finally:
         while len(tvm_arys) > 0:
             del tvm_arys[-1]
@@ -1887,7 +1888,7 @@ class OpScheduler(Scheduler):
                 #     if config["reduce"][count][-2] > 1:
                 #         print("unroll cache write", hybrid_fuse_lsts[-2][count + num_spatial_axes])
                 #         s[write_cache].unroll(hybrid_fuse_lsts[-2][count + num_spatial_axes])
-        
+
         def _micro_schedule_simple(s, op, op_state):
             # prepare extents
             sp_extents = [to_int(x.dom.extent) for x in op.axis]
