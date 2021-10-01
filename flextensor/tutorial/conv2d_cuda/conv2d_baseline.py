@@ -381,7 +381,7 @@ if __name__ == "__main__":
     else:
         end = args.to
     shapes = shapes[args.from_:end]
-    print("Changing batch size to ", args.batch)
+    # print("Changing batch size to ", args.batch)
     for i in range(len(shapes)):
         shapes[i] = list(shapes[i])
         shapes[i][0] = args.batch
@@ -411,13 +411,15 @@ if __name__ == "__main__":
     else:
         raise RuntimeError("Only implement pytorch baseline now, no '%s' baseline"%args.type)
     
-    print("%s baselines for %s convolution 2d for target %s (%d):" % (args.type, args.shapes, args.target, args.device))
+    # print("%s baselines for %s convolution 2d for target %s (%d):" % (args.type, args.shapes, args.target, args.device))
+    print("Case,execution_time(ms)")
     for i, shape in enumerate(shapes):
         count = i + args.from_ 
-        print("layer", count, shape)
+        # print("layer", count, shape)
         batch, in_channel, height, width, out_channel, _, k_h, k_w, _, stride, padding, dilation, groups = shape
         batch = args.batch
         cost = baseline(batch, height, width, in_channel, k_h, out_channel, stride=stride, padding=padding, dilation=dilation, groups=groups, number=args.number, dev=args.device)
-        print("Use %f(ms)" % cost)
-        print()
-    print("Done!")
+        # print("Use %f(ms)" % cost)
+        # print()
+        print(f"{int(i+1)},{cost}")
+    # print("Done!")

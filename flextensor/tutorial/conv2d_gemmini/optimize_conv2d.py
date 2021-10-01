@@ -148,8 +148,9 @@ def test(task_key, configs, dev_id=None, rpc_info=None):
     # print(func.imported_modules[0].get_source())
     dev_id = dev_id if dev_id is not None else task.dev_id
     time_cost = evaluate(task_key, s, bufs, task.target, dev_id, 10, rpc_info)
-    print(task_key, "use", time_cost, "ms")
-    print()
+    # print(task_key, "use", time_cost, "ms")
+    # print()
+    return time_cost
 
 
 # @tvm.register_func
@@ -224,9 +225,11 @@ if __name__ == "__main__":
                 logfile=sys.stdout,
                 )
     if args.test != "":
+        print("Case,execution time(ms)")
         with open(args.test, "r") as fin:
-            for line in fin:
+            for i, line in enumerate(fin):
                 name, string = line.split(":", 1)
                 obj = json.loads(string)
                 configs = Config(obj[0], obj[1])
-                test(name, configs, dev_id=args.device, rpc_info=rpc_info)
+                time_cost = test(name, configs, dev_id=args.device, rpc_info=rpc_info)
+                print(f"{int(i+1)},{time_cost}")
