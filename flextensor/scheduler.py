@@ -635,7 +635,7 @@ class Scheduler(object):
                             break
                     if not found:
                         msg = msg + error_str
-                    # print(msg)
+                    print(msg)
                     eval_res_lst.append(float("inf"))
 
                 else:
@@ -678,7 +678,7 @@ class Scheduler(object):
                                 break
                         if not found:
                             msg = msg + error_str
-                        # print(msg)
+                        print(msg)
                         ret_lst.append(float("inf"))
                     else:
                         ret_lst.append(final_res)
@@ -2035,7 +2035,7 @@ class OpScheduler(Scheduler):
             #     raise RuntimeError("Unknown hint: %s" % hint)
             return _cuda_schedule_split_reorder_fuse
         elif target == "llvm":
-            return _cpu_schedule_simple
+            return _cpu_schedule_split_fuse
         elif target == "micro":
             return _micro_schedule_simple
         else:
