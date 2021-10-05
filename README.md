@@ -58,4 +58,4 @@ To run the baselines, `PyTorch` is required.
 
 ## Tutorial Files
 
-flextensor/tutorials/*
+flextensor/tutorial/*
