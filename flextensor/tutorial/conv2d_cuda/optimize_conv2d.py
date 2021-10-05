@@ -147,7 +147,7 @@ def test(task_key, configs, dev_id=None, rpc_info=None):
     # func = tvm.build(s, bufs, "cuda")
     # print(func.imported_modules[0].get_source())
     dev_id = dev_id if dev_id is not None else task.dev_id
-    time_cost = evaluate(task_key, s, bufs, task.target, dev_id, 10, rpc_info)
+    time_cost = evaluate(task_key, s, bufs, task.target, dev_id, 100, rpc_info)
     # print(task_key, "use", time_cost, "ms")
     # print()
     return time_cost
