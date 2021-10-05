@@ -88,6 +88,8 @@ if __name__ == "__main__":
         count = i + args.from_ 
         # print("layer", count)
         N, K, M = shape
+        M = M * 16
+        K = K * 4
         cost = baseline(N, K, M, args.number, args.device)
         # print("Use %f(ms)" % cost)
         print(f"{int(i+1)},{cost}")
