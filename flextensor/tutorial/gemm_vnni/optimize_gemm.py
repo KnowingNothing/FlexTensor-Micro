@@ -128,13 +128,16 @@ def optimize(shapes, slevel=4, rlevel=3, target="llvm", dev_id=0, timeout=4.0, t
     return ret
 
 
-def test(task_key, configs, dev_id=None, rpc_info=None):
+def test(task_key, configs, dev_id=None, rpc_info=None, dump_ir=False):
     task = TASK_TABLE[task_key]
     s, bufs = schedule_with_config(task_key, configs)
+    if dump_ir:
+        print(tvm.lower(s, bufs, simple_mode=True))
     dev_id = dev_id if dev_id is not None else task.dev_id
-    time_cost = evaluate(task_key, s, bufs, task.target, dev_id, 10, rpc_info)
-    print(task_key, "use", time_cost, "ms")
-    print()
+    time_cost = evaluate(task_key, s, bufs, task.target, dev_id, 100, rpc_info)
+    # print(task_key, "use", time_cost, "ms")
+    # print()
+    return time_cost
 
 
 if __name__ == "__main__":
@@ -158,6 +161,7 @@ if __name__ == "__main__":
     parser.add_argument("--target_host", type=str, default="llvm")
     parser.add_argument("--port", type=int, default=9090)
     parser.add_argument("--dtype", type=str, default="float32")
+    parser.add_argument("--dump_ir", action="store_true")
     args = parser.parse_args()
     shapes = gemm_shapes
     if args.use_rpc:
@@ -197,11 +201,13 @@ if __name__ == "__main__":
     
     if args.test != "":
         with open(args.test, "r") as fin:
-            for line in fin:
+            print("Case,Execution Time(ms)")
+            for i, line in enumerate(fin):
                 name, string = line.split(":", 1)
                 obj = json.loads(string)
                 configs = Config(obj[0], obj[1])
-                test(name, configs, args.device, rpc_info=rpc_info)
+                cost = test(name, configs, args.device, rpc_info=rpc_info, dump_ir=args.dump_ir)
+                print(f"{i+1},{cost}")
 
     elif args.log != "":
         with open(args.log, "a") as flog:
