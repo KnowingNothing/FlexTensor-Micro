@@ -467,12 +467,26 @@ for shape in gemv_shapes:
         register_task(Task("gemv", "gemv", gemv, (N, K), "llvm", j))
         register_task(Task("gemv", "gemv", gemv, (N, K), "cuda", j))
 
+
+def gemm_uint8_int8(i, j, k, dtype="int32"):
+    a = tvm.placeholder((i, k, 16, 4), name='a', dtype="int8")
+    b = tvm.placeholder((k, j, 4), name='b', dtype="uint8")
+    kk = tvm.reduce_axis((0, k), name='k')
+    kki = tvm.reduce_axis((0, 4), name="ki")
+    c = tvm.compute((i, j, 16), lambda ii, jj, iii:
+                    tvm.sum(b[kk, jj, kki].astype(dtype) * a[ii, kk, iii, kki].astype(dtype), axis=[kk, kki]), name='c')
+    return [c.op], [b, a, c]
+
+
 for shape in gemm_shapes:
     N, K, M = shape
     for j in range(4):
         register_task(Task("gemm", "gemm", gemm, (N, K, M, "int8"), "micro", j))
+        register_task(Task("gemm", "gemm", gemm_uint8_int8, (M, N, K, "int32"), "llvm -mcpu=skylake-avx512", j))
+        register_task(Task("gemm", "gemm", gemm_uint8_int8, (M, N, K, "int32"), "llvm -mcpu=cascadelake", j))
         register_task(Task("gemm", "gemm", gemm, (N, K, M, "float32"), "llvm", j))
         register_task(Task("gemm", "gemm", gemm, (N, K, M, "float32"), "cuda", j))
+
 
 # for shape in test_gemm_shapes:
 #     N, K, M = shape

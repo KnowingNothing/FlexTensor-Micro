@@ -711,7 +711,7 @@ class OpScheduler(Scheduler):
         #     wanted_types = ["fuse", "reorder", "spatial", "reduce", "unroll"]
         # else:
         #     raise RuntimeError("Unknown hint: %s" % hint)
-        if self.task.target == "micro":
+        if self.task.target == "micro" or self.task.target == "llvm -mcpu=skylake-avx512" or self.task.target == "llvm -mcpu=cascadelake":
             wanted_types = ["spatial", "reduce", "intrin"]
         else:
             wanted_types = ["fuse", "reorder", "spatial", "reduce", "unroll"]
@@ -2024,6 +2024,109 @@ class OpScheduler(Scheduler):
                 to_reorder = reduce(lambda x, y: x + y, reversed(to_reorder), [])
                 s[op].reorder(*to_reorder)
 
+        def _vnni_schedule_simple(s, op, op_state):
+            # prepare extents
+            sp_extents = [to_int(x.dom.extent) for x in op.axis]
+            if hasattr(op, "reduce_axis"):
+                re_extents = [to_int(x.dom.extent) for x in op.reduce_axis]
+            else:
+                re_extents = []
+
+            if "intrin" in config:
+                target, ind, slist, rlist = config["intrin"][0]
+                intrin = INTRIN_TABLE[target][ind]
+            else:
+                intrin = None
+                s_list = []
+                r_list = []
+
+            sp_factors = []
+            re_factors = []
+            # spatial split
+
+            if "spatial" in config:
+                sub_sp_axis_list = []
+                for axis, f_list in zip(s[op].op.axis[:-1], config["spatial"][:-1]):
+                    split_list = []
+                    for factor in f_list[:-1]:
+                        outer, axis = s[op].split(axis, nparts=factor)
+                        split_list.append(outer)
+                    sp_factors.append(f_list[-1])
+                    split_list.append(axis)
+                    sub_sp_axis_list.append(split_list)
+            else:
+                sub_sp_axis_list = [[axis] for axis in s[op].op.axis]
+                sp_factors = sp_extents
+
+            # reduce split
+            if "reduce" in config and hasattr(op, "reduce_axis"):
+                sub_re_axis_list = []
+                for axis, f_list in zip(s[op].op.reduce_axis[:-1], config["reduce"][:-1]):
+                    split_list = []
+                    for factor in f_list[:-1]:
+                        outer, axis = s[op].split(axis, nparts=factor)
+                        split_list.append(outer)
+                    re_factors.append(f_list[-1])
+                    split_list.append(axis)
+                    sub_re_axis_list.append(split_list)
+            elif hasattr(op, "reduce_axis"):
+                sub_re_axis_list = [[axis] for axis in s[op].op.reduce_axis]
+                re_factors = re_extents
+            else:
+                sub_re_axis_list = []
+            # match intrinsic
+            def rearrange(lst):
+                return list(zip(*lst))
+
+            sub_sp_axis_list = rearrange(sub_sp_axis_list)
+            sub_re_axis_list = rearrange(sub_re_axis_list)
+
+            num_sp = len(sub_sp_axis_list) - 1
+            num_re = len(sub_re_axis_list) - 1
+            # inner-most
+            inner_most = [sub_sp_axis_list[num_sp]]
+            if num_re >= 0:
+                inner_most.append(sub_re_axis_list[num_re])
+            # do intrinsic
+            if intrin is not None:
+                to_reorder = []
+                for sp, re in zip(sub_sp_axis_list, sub_re_axis_list):
+                    to_reorder.extend(sp)
+                    to_reorder.extend(re)
+
+                m = s[op].op.axis[-1]
+                k = s[op].op.reduce_axis[-1]
+
+                to_reorder.extend([m, k])
+                s[op].reorder(*to_reorder)
+                # outer-most
+                outer_most = s[op].fuse(*sub_sp_axis_list[0])
+                s[op].parallel(outer_most)
+                
+                # tensorize
+                intrinsic = intrin.intrin(*(
+                    [16] + 
+                    [4] + 
+                    [16] + 
+                    [4] + 
+                    [m] + 
+                    [k]))
+                s[op].tensorize(m, intrinsic)
+            else:
+                to_reorder = []
+                while num_sp >= 0 and num_re >= 0:
+                    to_reorder.append(sub_sp_axis_list[num_sp] + sub_re_axis_list[num_re])
+                    num_sp -= 1
+                    num_re -= 1
+                while num_sp >= 0:
+                    to_reorder.append(sub_sp_axis_list[num_sp])
+                    num_sp -= 1
+                while num_re >= 0:
+                    to_reorder.append(sub_re_axis_list[num_re])
+                    num_re -= 1
+                to_reorder = reduce(lambda x, y: x + y, reversed(to_reorder), [])
+                s[op].reorder(*to_reorder)
+
         if target == "cuda":
             # if hint == "split_fuse":
             #     print(hint)
@@ -2038,6 +2141,8 @@ class OpScheduler(Scheduler):
             return _cpu_schedule_split_fuse
         elif target == "micro":
             return _micro_schedule_simple
+        elif target == "llvm -mcpu=skylake-avx512" or target == "llvm -mcpu=cascadelake":
+            return _vnni_schedule_simple
         else:
             raise RuntimeError("Currently no support for target %s"%target)  
 
@@ -2234,7 +2339,7 @@ def schedule(task_key, slevel=4, rlevel=3, op_trial=50, graph_trial=10, op_stop=
         schedule_graph = True
         graph_space = generate_space_inter_op(
             op_lst, down_graph, force_inline=force_inline, special_space=task.special_space)
-    elif task.target == "micro":
+    elif task.target == "micro" or task.target == "llvm -mcpu=skylake-avx512" or task.target == "llvm -mcpu=cascadelake":
         schedule_graph = False
         graph_space = generate_empty_space_inter_op()
     else:
@@ -2262,6 +2367,8 @@ def schedule(task_key, slevel=4, rlevel=3, op_trial=50, graph_trial=10, op_stop=
                                             reorder_policy="off")
         elif task.target == "micro":
             space = generate_op_space_with_intrin(op, rpc_info.target)
+        elif task.target == "llvm -mcpu=skylake-avx512" or task.target == "llvm -mcpu=cascadelake":
+            space = generate_op_space_with_intrin(op, task.target)
         else:
             raise RuntimeError("Currently no support for target %s"%task.target)
         total_size *= len(space)
