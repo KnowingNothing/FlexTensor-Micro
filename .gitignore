@@ -5,3 +5,4 @@ experiment_data
 .idea
 lib
 *.log
+*tmp.png
