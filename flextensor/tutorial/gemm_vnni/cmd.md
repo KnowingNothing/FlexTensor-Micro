@@ -1,5 +1,5 @@
 # run flextensor (cascadelake)
-python optimize_gemm.py --target "llvm -mcpu=cascadelake" --target_host "llvm -mcpu=cascadelake" --parallel 8 --timeout 20 --log gemm_config.log
+python optimize_gemm.py --target "llvm -mcpu=cascadelake" --target_host "llvm -mcpu=cascadelake" --parallel 8 --timeout 20 --log gemm_config.log --dtype int32
 
 # run flextensor (skylake)
 python optimize_gemm.py --target "llvm -mcpu=skylake-avx512" --target_host "llvm -mcpu=skylake-avx512" --parallel 8 --timeout 20 --log gemm_config.log
