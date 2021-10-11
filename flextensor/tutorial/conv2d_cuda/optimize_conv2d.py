@@ -140,12 +140,14 @@ def optimize(prefix, from_, shapes, target="llvm", dev_id=0, trials=100, timeout
     return ret
 
 
-def test(task_key, configs, dev_id=None, rpc_info=None):
+def test(task_key, configs, dev_id=None, rpc_info=None, dump_ir=False, dump_code=False):
     task = TASK_TABLE[task_key]
     s, bufs = schedule_with_config(task_key, configs)
-    # print(tvm.lower(s, bufs, simple_mode=True))
-    # func = tvm.build(s, bufs, "cuda")
-    # print(func.imported_modules[0].get_source())
+    if dump_ir:
+        print(tvm.lower(s, bufs, simple_mode=True))
+    if dump_code:
+        func = tvm.build(s, bufs, "cuda")
+        print(func.imported_modules[0].get_source())
     dev_id = dev_id if dev_id is not None else task.dev_id
     time_cost = evaluate(task_key, s, bufs, task.target, dev_id, 100, rpc_info)
     # print(task_key, "use", time_cost, "ms")
@@ -179,6 +181,8 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, default=9090)
     parser.add_argument("--force_inline", action="store_true")
     parser.add_argument("--use_rpc", action="store_true")
+    parser.add_argument("--dump_ir", action="store_true")
+    parser.add_argument("--dump_code", action="store_true")
     # parser.add_argument("--op_hint", type=str, default="split_fuse")
     args = parser.parse_args()
     if args.use_rpc:
@@ -231,5 +235,5 @@ if __name__ == "__main__":
                 name, string = line.split(":", 1)
                 obj = json.loads(string)
                 configs = Config(obj[0], obj[1])
-                time_cost = test(name, configs, dev_id=args.device, rpc_info=rpc_info)
+                time_cost = test(name, configs, dev_id=args.device, rpc_info=rpc_info, dump_ir=args.dump_ir, dump_code=args.dump_code)
                 print(f"{int(i+1)},{time_cost}")
