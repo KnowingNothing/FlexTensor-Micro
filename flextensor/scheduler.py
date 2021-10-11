@@ -20,7 +20,7 @@ from flextensor.intrinsic import INTRIN_TABLE
 try:
     from flextensor.model import WalkerGroup
 except ImportError:
-    print("[Warning] Import model module failed, please check if PyTorch is installed.")
+    print("[FlexTensor] [Warning] Import model module failed, please check if PyTorch is installed.")
 from flextensor.space import generate_space_inter_op, generate_space_intra_op, \
                              generate_empty_space_inter_op, generate_op_space_with_intrin
 from flextensor.utils import assert_print, to_int, to_tuple, Config, RpcInfo
@@ -59,7 +59,7 @@ def verify_code(stmt, target, dev_id):
     if target == "cuda":
         ctx = tvm.nd.context(target, dev_id)     # just use device 0
         if not ctx.exist:
-            # print("Fail to get device %s devid=%d"%(target, dev_id))
+            # print("[FlexTensor] Fail to get device %s devid=%d"%(target, dev_id))
             return False
         max_dims = ctx.max_thread_dimensions
         check_gpu = {
@@ -224,7 +224,7 @@ def call_with_timeout(func, queue, timeout, args, kwargs):
     except Empty:
         res = multi.TimeoutError()
     except Exception as e:
-        print("Exception in process {}: {}".format(os.getpid(), str(e)))
+        print("[FlexTensor] Exception in process {}: {}".format(os.getpid(), str(e)))
         res = e
     kill_child_processes(p.pid)
     p.terminate()
@@ -304,19 +304,19 @@ class Scheduler(object):
                 for res in warm_up_results:
                     string += "%.6f " % res
                 string += "]"
-                print("warm up [%.6f] %s" % (time.time(), string))
+                print("[FlexTensor] warm up [%.6f] %s" % (time.time(), string))
                 for count in range(warm_up_trials):
                     if warm_up_results[count] < float("inf"):
                         self.walker_group.record(warm_up_indices[count], warm_up_results[count])                    
             # if not found valid config
             if not self.walker_group.top1():
-                print("Warning: No valid schedule found in warm up process, please use more trials")
-                print("Now automatically use more trials, increase %d" % warm_up_trials) 
+                print("[FlexTensor] Warning: No valid schedule found in warm up process, please use more trials")
+                print("[FlexTensor] Now automatically use more trials, increase %d" % warm_up_trials) 
                 warm_up_epoches = 1
                 count_repeat += 1
                 self.timeout = min(2 * self.timeout, 40)
                 if count_repeat >= max_repeat:
-                    print("Fail to find valid schedule, too many errors")
+                    print("[FlexTensor] Fail to find valid schedule, too many errors")
                     warm_up_enough = True
             else:
                 warm_up_enough = True
@@ -358,10 +358,10 @@ class Scheduler(object):
                 self._warm_up(warm_up_epoches, warm_up_trials, configs, type_keys, use_model=use_model)
                 continue
             from_indices, from_value = self.walker_group.top_random(with_value=True)
-            # # print("check from", from_indices)
+            # # print("[FlexTensor] check from", from_indices)
             # get all directions
             next_indices_lst, action_lst = self.walker_group.full_walk(from_indices, no_repeat=True)
-            # # print("check action", action_lst)
+            # # print("[FlexTensor] check action", action_lst)
             next_configs = [self.walker_group.to_config(indices) for indices in next_indices_lst]
             # if empty
             if len(next_configs) < 1:
@@ -378,7 +378,7 @@ class Scheduler(object):
             for res in results:
                 string += "%.6f " % res
             string += "]"
-            print("tune [%.6f] %s" % (time.time(), string))
+            print("[FlexTensor] tune [%.6f] %s" % (time.time(), string))
             rewards = [np.tanh(max(from_value - result, 0.0)) for result in results]
 
             is_local_minimal = True
@@ -410,10 +410,10 @@ class Scheduler(object):
             else:
                 cur_best_value = minimal[1]
                 cur_best = minimal[0]
-            print("No. %d | [%.6f] The best currently %.6f" % (trial, time.time(), cur_best_value), cur_best)
+            print("[FlexTensor] No. %d | [%.6f] The best currently %.6f" % (trial, time.time(), cur_best_value), cur_best)
             # early stop becasue of lasting empty trials
             if count_incessant_empty_trial >= self.early_stop:
-                print("Early stop after continuous no trials %d times" % (count_incessant_empty_trial))
+                print("[FlexTensor] Early stop after continuous no trials %d times" % (count_incessant_empty_trial))
                 break
             # early stop because of repeating value
             if math.fabs(cur_best_value - value_early_stop) < 0.02:
@@ -422,7 +422,7 @@ class Scheduler(object):
                 value_early_stop = cur_best_value
                 early_stop_count = 0
             if early_stop_count >= self.early_stop:
-                print("Early stop with value %f repeats %d times" % (value_early_stop, early_stop_count))
+                print("[FlexTensor] Early stop with value %f repeats %d times" % (value_early_stop, early_stop_count))
                 break 
             # train and re-evaluate
             if (trial + 1) % part == 0:
@@ -451,7 +451,7 @@ class Scheduler(object):
                     for res in results:
                         string += "%.6f " % res
                     string += "]"
-                    print("re-evaluate [%.6f] %s" % (time.time(), string))
+                    print("[FlexTensor] re-evaluate [%.6f] %s" % (time.time(), string))
                     for indices, result in zip(indices_lst, results):
                         if result < float("inf"):
                             # if inf, maybe this measure is wrong
@@ -512,7 +512,7 @@ class Scheduler(object):
             if self.walker_group.top1_value() < best_value:
                 best_value = self.walker_group.top1_value()
                 best = self.walker_group.top1()
-            print("No. %d | [%.6f] The best currently %.6f" % (trial, time.time(), best_value), best)
+            print("[FlexTensor] No. %d | [%.6f] The best currently %.6f" % (trial, time.time(), best_value), best)
             # early stop
             if math.fabs(best_value - value_early_stop) < 0.02:
                 early_stop_count += 1
@@ -520,11 +520,11 @@ class Scheduler(object):
                 value_early_stop = best_value
                 early_stop_count = 0
             if early_stop_count >= self.early_stop:
-                print("Early stop with value %f repeats %d times" % (value_early_stop, early_stop_count))
+                print("[FlexTensor] Early stop with value %f repeats %d times" % (value_early_stop, early_stop_count))
                 break 
             # empty, stop
             if not self.walker_group.has_more():
-                print("No more points, end of scheduling")
+                print("[FlexTensor] No more points, end of scheduling")
                 break
             # reload next points
             retired_indices.extend(cur_lst)
@@ -540,7 +540,7 @@ class Scheduler(object):
                     for indices, value in retired_indices[-self.parallel:-1]:
                         self.walker_group.record(indices, value, random_reject=False)
                     indices_lst = self.walker_group.topk(self.parallel, modify=True)
-                    print("check next indices:", indices_lst)
+                    print("[FlexTensor] check next indices:", indices_lst)
                     next_configs = [self.walker_group.to_config(indices) for indices in indices_lst]
                     results = self.parallel_evaluate(configs, next_configs, number=self.number)
                     self.walker_group.add_perf_data(indices_lst, results)
@@ -548,7 +548,7 @@ class Scheduler(object):
                     for res in results:
                         string += "%.6f " % res
                     string += "]"
-                    print("re-evaluate [%.6f] %s" % (time.time(), string))
+                    print("[FlexTensor] re-evaluate [%.6f] %s" % (time.time(), string))
                     for indices, result in zip(indices_lst, results):
                         self.walker_group.record(indices, result, random_reject=False)
                 # re-warm up
@@ -568,8 +568,8 @@ class Scheduler(object):
         raise NotImplementedError()
 
     def _parallel_evaluate(self, old_configs, new_configs, mode="op", number=1):
-        # # print("check config", old_configs, new_configs)
-        # print("parallel_evaluate begins...")
+        # # print("[FlexTensor] check config", old_configs, new_configs)
+        # print("[FlexTensor] parallel_evaluate begins...")
         target = self.task.target
         if target == "micro":
             assert self.rpc_info is not None
@@ -581,9 +581,9 @@ class Scheduler(object):
             os.mkdir(LIB_DIR)
         except OSError as e:
             if os.path.exists(LIB_DIR) and os.path.isdir(LIB_DIR):
-                print("[Warning] Directory %s is not empty, but reusing it" % LIB_DIR)
+                print("[FlexTensor] [Warning] Directory %s is not empty, but reusing it" % LIB_DIR)
             else:
-                print("[Error] Fail to create directory %s\nReason: %s" % (LIB_DIR, str(e)))
+                print("[FlexTensor] [Error] Fail to create directory %s\nReason: %s" % (LIB_DIR, str(e)))
                 exit(1)
         for ep in range(math.ceil(total_configs / self.parallel)):
             part_configs = new_configs[ep * self.parallel:(ep + 1) * self.parallel]
@@ -615,9 +615,9 @@ class Scheduler(object):
             # time.sleep(self.timeout)
             eval_res_lst = []
             for i, build_res in enumerate(build_res_lst):
-                # print("build result get begins...")
+                # print("[FlexTensor] build result get begins...")
                 final_res = build_res.get(timeout=self.timeout)
-                # print("build resutl get done.")
+                # print("[FlexTensor] build resutl get done.")
                 func_name = func_name_lst[i]
                 if isinstance(final_res, Exception):
                     msg = mode + " build fail:"
@@ -659,9 +659,9 @@ class Scheduler(object):
                 if isinstance(eval_res, float):
                     ret_lst.append(eval_res)
                 else:
-                    # print("evluate result getting...")
+                    # print("[FlexTensor] evluate result getting...")
                     final_res = eval_res.get(timeout=self.timeout)
-                    # print("evlaute result get done.")
+                    # print("[FlexTensor] evlaute result get done.")
                     if isinstance(final_res, Exception):
                         msg = mode + " run fail:"
                         # print(final_res.__class__)
@@ -690,12 +690,12 @@ class Scheduler(object):
                     os.remove(os.path.join(LIB_DIR, func_name))
                 except FileNotFoundError:
                     pass
-                    # print("File not found when deleting")
+                    # print("[FlexTensor] File not found when deleting")
         try:
             shutil.rmtree(LIB_DIR)
         except Exception as e:
             print(e)
-        # print("parallel evaluate done.")
+        # print("[FlexTensor] parallel evaluate done.")
         return total_res_lst
 
 
@@ -1735,11 +1735,11 @@ class OpScheduler(Scheduler):
                 spatial_fuse_extents.append(tmp_extent)
                 reorder_lst.extend(tmp_buffer)
             reorder_lst_without_none = list(filter(lambda x: x is not None, reorder_lst))
-            # print("reorder op", reorder_lst_without_none)
+            # print("[FlexTensor] reorder op", reorder_lst_without_none)
             s[op].reorder(*reorder_lst_without_none)
             for fuse_lst in spatial_fuse_lsts[:1]:
                 tmp_buffer = list(filter(lambda x: x is not None, fuse_lst))
-                # print("fuse op", tmp_buffer)
+                # print("[FlexTensor] fuse op", tmp_buffer)
                 fused = s[op].fuse(*tmp_buffer)
                 fused_spatial_axes.append(fused)
             kernel_scope = fused_spatial_axes[0]
@@ -1759,7 +1759,7 @@ class OpScheduler(Scheduler):
                 count = len(spatial_fuse_lsts[1]) - 1
                 while count >= 1:
                     if spatial_fuse_lsts[1][count] is not None and config["spatial"][1][count] > 1:
-                        # print("vectorize op", spatial_fuse_lsts[1][count])
+                        # print("[FlexTensor] vectorize op", spatial_fuse_lsts[1][count])
                         s[op].vectorize(spatial_fuse_lsts[1][count])
                         break
                     count -= 1
@@ -1767,13 +1767,13 @@ class OpScheduler(Scheduler):
                 count = len(spatial_fuse_lsts[-1]) - 1
                 while count >= 0:
                     if spatial_fuse_lsts[-1][count] is not None and config["spatial"][count][-1] > 1:
-                        # print("vectorize op", spatial_fuse_lsts[-1][count])
+                        # print("[FlexTensor] vectorize op", spatial_fuse_lsts[-1][count])
                         s[op].vectorize(spatial_fuse_lsts[-1][count])
                         break
                     count -= 1
 
             # always compute at here
-            # print("compute at", next_pos_for_comptue_at)
+            # print("[FlexTensor] compute at", next_pos_for_comptue_at)
             s[write_cache].compute_at(s[op], next_pos_for_comptue_at)
 
             # spatial_split for write cache
@@ -1860,7 +1860,7 @@ class OpScheduler(Scheduler):
                 tmp_buffer.extend(last_parts[:-num_reduce_axes])
                 hybrid_reorder_lst.extend(tmp_buffer)
             hybrid_reorder_lst_without_none = list(filter(lambda x: x is not None, hybrid_reorder_lst))
-            # print("reorder cache write", hybrid_reorder_lst_without_none)
+            # print("[FlexTensor] reorder cache write", hybrid_reorder_lst_without_none)
             s[write_cache].reorder(*hybrid_reorder_lst_without_none)
 
             # fuse without reduce axes
@@ -1873,20 +1873,20 @@ class OpScheduler(Scheduler):
                 while config["spatial"][rcount][-1] == 1:
                     rcount -= 1
                 if rcount >= 0:
-                    # print("vectorize cache write", hybrid_fuse_lsts[-1][rcount])
+                    # print("[FlexTensor] vectorize cache write", hybrid_fuse_lsts[-1][rcount])
                     s[write_cache].vectorize(hybrid_fuse_lsts[-1][rcount])
                 for count in range(rcount):
                     if config["spatial"][count][-1] > 1:
-                        # print("unroll cache write", hybrid_fuse_lsts[-1][count])
+                        # print("[FlexTensor] unroll cache write", hybrid_fuse_lsts[-1][count])
                         s[write_cache].unroll(hybrid_fuse_lsts[-1][count])
             if len(hybrid_fuse_lsts) > 2:
                 for count in range(num_spatial_axes):
                     if config["spatial"][count][-2] > 1:
-                        # print("unroll cache write", hybrid_fuse_lsts[-2][count])
+                        # print("[FlexTensor] unroll cache write", hybrid_fuse_lsts[-2][count])
                         s[write_cache].unroll(hybrid_fuse_lsts[-2][count])
                 # for count in range(num_reduce_axes):
                 #     if config["reduce"][count][-2] > 1:
-                #         print("unroll cache write", hybrid_fuse_lsts[-2][count + num_spatial_axes])
+                #         print("[FlexTensor] unroll cache write", hybrid_fuse_lsts[-2][count + num_spatial_axes])
                 #         s[write_cache].unroll(hybrid_fuse_lsts[-2][count + num_spatial_axes])
 
         def _micro_schedule_simple(s, op, op_state):
@@ -2254,12 +2254,12 @@ class Result(object):
         #     else:
         #         break
         try:
-            # print("getting...")
+            # print("[FlexTensor] getting...")
             # while self.q.empty():
             #     pass
-            # print("queue is empty? ", self.q.empty())
+            # print("[FlexTensor] queue is empty? ", self.q.empty())
             res = self.q.get(block=True, timeout=timeout)
-            # print("done")
+            # print("[FlexTensor] done")
             # while not self.q.empty():
             #     _ = self.q.get(block=True)
         except Exception as e:
@@ -2270,9 +2270,9 @@ class Result(object):
             self.p.terminate()
         self.p.join()
         self.q.close()
-        # print("queue joining...")
+        # print("[FlexTensor] queue joining...")
         self.q.join_thread()
-        # print("queue joined")
+        # print("[FlexTensor] queue joined")
         del self.p
         del self.q
         return res
@@ -2346,7 +2346,7 @@ def schedule(task_key, slevel=4, rlevel=3, op_trial=50, graph_trial=10, op_stop=
         raise RuntimeError("Currently no support for target %s"%task.target)
 
     graph_space_size = len(graph_space)
-    print("graph space size", graph_space_size)
+    print("[FlexTensor] graph space size", graph_space_size)
     total_size = graph_space_size
 
     ##################################################
@@ -2372,7 +2372,7 @@ def schedule(task_key, slevel=4, rlevel=3, op_trial=50, graph_trial=10, op_stop=
         else:
             raise RuntimeError("Currently no support for target %s"%task.target)
         total_size *= len(space)
-        print("op", pos, "space size:", len(space))
+        print("[FlexTensor] op", pos, "space size:", len(space))
         op_space_lst.append(space)
         op_scheduler = OpScheduler(
             task_key, 
@@ -2386,8 +2386,8 @@ def schedule(task_key, slevel=4, rlevel=3, op_trial=50, graph_trial=10, op_stop=
             rpc_info=rpc_info,
             rewrite=rewrite
             )
-        # print("###########################################")
-        # print("Scheduling", op)
+        # print("[FlexTensor] ###########################################")
+        # print("[FlexTensor] Scheduling", op)
         use_model = False if op_perf_model_path_lst[pos] is None else True
         perf_path = op_perf_model_path_lst[pos]
         if force_inline and "inline" in graph_space.subspaces \
@@ -2402,7 +2402,7 @@ def schedule(task_key, slevel=4, rlevel=3, op_trial=50, graph_trial=10, op_stop=
                 )
         configs.op_config_lst.append(op_config)
     
-    print("space size", total_size)
+    print("[FlexTensor] space size", total_size)
 
     #################################################
     # inter operations schedule decisions 
